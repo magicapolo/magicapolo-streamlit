@@ -1,0 +1,70 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+st.set_page_config(page_title="Apolo Magic", layout="centered")
+
+st.image("apolo_magic_cover.jpg", use_column_width=True)
+st.title("🛩️ Apolo Magic - Predictor Aviator")
+
+st.markdown("""
+Bienvenido a **Apolo Magic**, tu asistente de predicción para el juego Aviator, basado en análisis técnico con soporte y resistencia.
+
+👉 Ingresa los últimos coeficientes del juego (mínimo 10) y el sistema estimará si el próximo valor será **mayor o menor a 1.50**, e incluso **dará alerta si podría ser mayor a 5.0**.
+""")
+
+# Entrada de coeficientes
+user_input = st.text_area("✍️ Ingresa los últimos coeficientes separados por comas:", placeholder="1.43, 1.98, 2.35, 0.75, ...")
+
+def parse_input(input_str):
+    try:
+        return [float(x.strip()) for x in input_str.split(",") if x.strip()]
+    except:
+        return None
+
+def predict_next(coefs):
+    if len(coefs) < 10:
+        return "❌ Ingresa al menos 10 coeficientes para obtener una predicción.", None, None
+
+    data = pd.Series(coefs)
+
+    support = data.quantile(0.25)
+    resistance = data.quantile(0.75)
+    last = data.iloc[-1]
+
+    alert = False
+    pred = "⬆️ Mayor a 1.50" if last > support else "⬇️ Menor a 1.50"
+
+    # Si ha habido una secuencia de bajos dentro del canal, hay probabilidad de rompimiento
+    recent = data[-5:]
+    if all((support <= x <= resistance) for x in recent):
+        alert = True
+
+    return pred, support, resistance if alert else None
+
+coefs = parse_input(user_input)
+
+if coefs:
+    prediction, support, resistance = predict_next(coefs)
+
+    if isinstance(prediction, str):
+        st.subheader("🔮 Predicción:")
+        st.success(prediction)
+
+    if resistance:
+        st.warning(f"⚠️ ¡Alerta! Alta probabilidad de ronda >5.0\n\n**Resistencia:** {resistance:.2f}")
+
+    # Mostrar gráfico
+    st.subheader("📈 Gráfico de Coeficientes")
+    fig, ax = plt.subplots()
+    ax.plot(coefs, marker='o', linestyle='-', color='skyblue')
+    ax.axhline(support, color='green', linestyle='--', label=f"Soporte ({support:.2f})")
+    ax.axhline(resistance, color='red', linestyle='--', label=f"Resistencia ({resistance:.2f})")
+    ax.set_title("Historial de Coeficientes")
+    ax.set_ylabel("Coeficiente")
+    ax.set_xlabel("Ronda")
+    ax.legend()
+    st.pyplot(fig)
+elif user_input.strip():
+    st.error("❌ Asegúrate de ingresar solo números válidos separados por comas.")
